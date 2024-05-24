@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import psutil
 
 def get_active_devices():
@@ -8,7 +10,7 @@ def get_active_devices():
             if io_counters[interface].bytes_sent > 0 or io_counters[interface].bytes_recv > 0:
                 for addr in addrs:
                     if addr.family == psutil.AF_LINK:  # Checa se é um MAC address
-                        if(addr.address == "00:00:00:00:00:00"): #Ignora os mac inválidos
+                        if(addr.address == "00:00:00:00:00:00"): #Ignora os mac address inválidos
                             continue;
                         active_devices.append((interface, addr.address))
     return active_devices

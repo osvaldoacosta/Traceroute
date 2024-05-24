@@ -3,53 +3,9 @@
 import socket
 from show_routes import exibir_rota
 
-import psutil
-
+import socket_creation
 DEVICE_NAME = None;
 
-
-
-def get_active_devices():
-    active_devices = []
-    io_counters = psutil.net_io_counters(pernic=True)
-    for interface, addrs in psutil.net_if_addrs().items():
-        if interface in io_counters:
-            if io_counters[interface].bytes_sent > 0 or io_counters[interface].bytes_recv > 0:
-                for addr in addrs:
-                    if addr.family == psutil.AF_LINK:  # Checa se é um MAC address
-                        if(addr.address == "00:00:00:00:00:00"): #Ignora os mac address inválidos
-                            continue;
-                        active_devices.append((interface, addr.address))
-    return active_devices
-
-#TODO: mudar para deixar o dispositivo modular
-def create_icmp_receive_socket(port,timeout):
-    socket_rec_icmp = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
-
-    s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.IPPROTO_IP)
-    socket_rec_icmp.settimeout(timeout)
-    s.bind((DEVICE_NAME, port))
-
-    return socket_rec_icmp
-
-def create_udp_send_socket(ttl):
-    ssnd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-    ssnd.setsockopt(socket.SOL_IP, socket.IP_TTL, ttl)
-    return ssnd
-
-#TODO: CLI
-
-# def input_website():
-#
-#     site = site_addr = ""
-#     while site_addr == "":
-#         try:
-#             site = input("Digite o nome do website(ou ip) de destino: ")
-#             site_addr = socket.gethostbyname(site)
-#         except socket.error:
-#             print("Destinatario fora de alcance!")
-#
-#     return [site, site_addr]
 
 def get_website(site_addr=""):
     site = site_addr
@@ -88,8 +44,8 @@ def tracer(srec, ssend, port, ttl, destination_address, timeout):
 
 
 def resend_msg(alvo, port, ttl, timeout):
-    socket_recv = create_icmp_receive_socket(port,timeout)
-    socket_sender = create_udp_send_socket(ttl)
+    socket_recv = socket_creation.create_icmp_receive_socket(port,timeout,DEVICE_NAME)
+    socket_sender = socket_creation.create_udp_send_socket(ttl)
     socket_sender.sendto(b'Tapioca!', (alvo, port))
 
     return socket_recv, socket_sender
@@ -115,9 +71,9 @@ def traceroute(destination_address, max_hops=60, timeout=3,max_rejections=15):
 
     while ttl < max_hops:
         #Socket icmp recebimento
-        srec = create_icmp_receive_socket(port,timeout)
+        srec = socket_creation.create_icmp_receive_socket(port,timeout, DEVICE_NAME)
         #Socket udp envio
-        ssnd = create_udp_send_socket(ttl)
+        ssnd = socket_creation.create_udp_send_socket(ttl)
 
        
         ssnd.sendto(b'Tapioca', (destination_address,port))

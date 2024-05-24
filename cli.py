@@ -1,11 +1,11 @@
 
 import traceroute as tr  
-
+import detectDevice
 
 if __name__ == "__main__":
     destino = ""
 
-    devices = tr.get_active_devices()  # PEga os dispositivos de ethernet da maquina 
+    devices = detectDevice.get_active_devices()  # PEga os dispositivos de ethernet da maquina 
     #que estao trafegando pacotes e possuem um MAC válido
 
     if not devices:

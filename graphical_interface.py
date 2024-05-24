@@ -1,12 +1,12 @@
 import tkinter as tk
 from tkinter.font import BOLD
 
-import traceroute as tr  
-
+import traceroute as tr
 from detectDevice import get_active_devices
 import customtkinter
 
 def enviar_dados():
+    #TODO: melhorar isso
     selected_item= ([device for device in devices if device[0] == combo_box.get()] or [""])[0]
     address = address_entry.get()
 
@@ -28,9 +28,9 @@ def on_click(event):
 root = customtkinter.CTk()
 root.geometry("800x600")
 
-# Combobox for selecting items
-devices = get_active_devices(); # PEga os dispositivos de ethernet que estao trafegando pacotes e possuem um MAC válido
 
+devices = get_active_devices()  # PEga os dispositivos de ethernet da maquina 
+#que estao trafegando pacotes e possuem um MAC válido
 print(devices)
 
 
