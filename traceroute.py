@@ -2,7 +2,6 @@
 
 import socket
 from show_routes import exibir_rota
-
 import socket_creation
 DEVICE_NAME = None;
 
@@ -103,11 +102,12 @@ def traceroute(destination_address, max_hops=60, timeout=3,max_rejections=15):
 
 
 
-def start(website_address):
+def start(website_address, ttl=60, timeout=3, max_rejections=15):
     website, website_address = get_website(website_address)
 
     
     print(f"Destino: {website} ({website_address})")
-    traceroute(website_address)
+    traceroute(website_address,max_hops=ttl, timeout=timeout, max_rejections=max_rejections)
+
 
 
