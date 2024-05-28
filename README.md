@@ -19,9 +19,13 @@ sudo python graphical_interface.py
   - [x] Adaptar codigo do traceroute cli para gui
   - [x] Representação dos roteadores de maneira grafica
   - [x] Adicionar os roteadores on the go, ao realizar os hops
-- [ ] Tentar integrar o ping com traceroute
+- [ ] Fazer com que os botoes dos protocolos do gui funcionem
+- [x] Tentar integrar o ping com traceroute
 - [x] Usar mais de uma thread
-- [ ] Realizar envio de pacotes UDP, ICMP e TCP
+- [ ] Realizar envio de pacotes:
+  - [x] UDP
+  - [ ] ICMP
+  - [ ] TCP
 - [ ] Adicionar suporte ao ipv6 e ipv4
 
 ### Dependencias:

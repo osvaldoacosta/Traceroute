@@ -1,6 +1,7 @@
 from urllib.request import urlopen
 from json import load
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 def show_routes_print(enderecos):
     routers = []
 
@@ -34,7 +35,7 @@ def format_data(city, region, country, org):
     country = country if country else "???"
     org = org if org else "???"
 
-    return f"{org} : {city}, {region} - {country}"
+    return f"{org}\n{city}, {region} - {country}"
 
 def ipInfo(address):
     if address == '' or address == '*':

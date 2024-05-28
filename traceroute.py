@@ -1,32 +1,29 @@
 #!/usr/bin/env python
 
 import socket
-from show_routes import show_routes_print
+from show_routes import address_info, show_routes_print
 import socket_creation
+import time
 global DEVICE_NAME
 
 
-def get_website(site_addr=""):
-    site = site_addr
-    try:
-        site_addr = socket.gethostbyname(site_addr)
-        print(site, site_addr)
-    except socket.error:
-        return [site_addr,None]
-
-    return [site, site_addr]
 
 
 def tracer(srec, ssend, port, ttl, destination_address, timeout, update_output):
     busca = ""
     hasEnded = False
 
+    ping_time: float = 0.0
     for cont in range(3):
         try:
+
+            start_time = time.time()
             info, (addr, _) = srec.recvfrom(2000)
+            end_time = time.time()
 
             if addr != "*":
                 busca += addr
+                ping_time = (end_time - start_time) * 1000
                 hasEnded = True
                 break
 
@@ -37,9 +34,9 @@ def tracer(srec, ssend, port, ttl, destination_address, timeout, update_output):
             ssend.close()
 
             if not hasEnded:
-                socket_recv, socket_sender = resend_msg(destination_address, port, ttl, timeout)
+                resend_msg(destination_address, port, ttl, timeout)
 
-    return busca, define_addr(busca)
+    return busca, define_addr(busca),ping_time
 
 
 def resend_msg(alvo, port, ttl, timeout):
@@ -68,11 +65,13 @@ def show_routes(addresses, update_output, add_router):
             update_output(f"Timeout or unreachable: {address}")
 
 
-def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, update_output=None, add_router=None):
+def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, update_output=None, add_router=None, with_location=False):
     ttl = 1
     rejections = 0
     addresses = []
     port = 33434
+
+    total_time:float= 0.0
 
     while ttl < max_hops:
         srec = socket_creation.create_icmp_receive_socket(port, timeout, DEVICE_NAME)
@@ -83,7 +82,17 @@ def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, u
         if update_output:
             update_output(f"\nTTL: {ttl}")
 
-        tries, addr = tracer(srec, ssnd, port, ttl, destination_address, timeout, update_output)
+        tries, addr,ping_time= tracer(srec, ssnd, port, ttl, destination_address, timeout, update_output)
+
+        total_time = total_time + ping_time
+
+        addr_w_ping = f"{addr}\n({ping_time:.2f} ms)" if ping_time else addr
+        
+        if with_location:
+            addr_info = address_info(addr)
+            addr_description = f"{addr_w_ping}\n{addr_info}"
+        else:
+            addr_description = addr_w_ping
 
         if update_output:
             update_output(f"Tentativa no endereço: {tries}")
@@ -92,9 +101,9 @@ def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, u
             rejections += 1
         else:
             rejections = 0
-        
+      
         if add_router:
-            add_router(addr)
+            add_router(addr_description)
 
         addresses.append(addr)
 
@@ -112,11 +121,11 @@ def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, u
         if update_output:
             update_output(f"Houve um erro ao tentar rastrear a rota: {error}")
 
-def start(website_address, ttl=60, timeout=3, max_rejections=15, update_output=None, add_router=None):
-    website, website_address = get_website(website_address)
+def start(website_address, ttl=60, timeout=3, max_rejections=15, update_output=None, add_router=None, with_geoinfo=False):
+    website, website_address = socket_creation.get_website(website_address)
 
     if update_output:
         update_output(f"Destino: {website} ({website_address})")
 
     traceroute(website_address, max_hops=ttl, timeout=timeout, max_rejections=max_rejections,
-               update_output=update_output, add_router=add_router)
+               update_output=update_output, add_router=add_router, with_location=with_geoinfo)
