@@ -1,8 +1,11 @@
 from PyQt5 import QtWidgets, QtGui, QtCore, QtSvg
+from PyQt5.QtCore import QThread, pyqtSignal
 import sys
 import random
 from detectDevice import get_active_devices
 import traceroute as tr
+
+
 
 class TracerouteUI(QtWidgets.QWidget):
     def __init__(self):
@@ -17,37 +20,30 @@ class TracerouteUI(QtWidgets.QWidget):
         self.main_layout = QtWidgets.QVBoxLayout()
         self.setLayout(self.main_layout)
 
-        # Main frame
-        self.main_frame = QtWidgets.QWidget()
-        self.main_frame_layout = QtWidgets.QVBoxLayout()
-        self.main_frame.setLayout(self.main_frame_layout)
-        self.main_layout.addWidget(self.main_frame)
+        self.stacked_widget = QtWidgets.QStackedWidget()
+        self.main_layout.addWidget(self.stacked_widget)
 
-        # Advanced options frame
-        self.advanced_options_frame = QtWidgets.QWidget()
-        self.advanced_options_frame_layout = QtWidgets.QVBoxLayout()
-        self.advanced_options_frame.setLayout(self.advanced_options_frame_layout)
-        self.advanced_options_frame.setVisible(False)
-        self.main_layout.addWidget(self.advanced_options_frame)
+        # Input form widget
+        self.input_form_widget = QtWidgets.QWidget()
+        self.stacked_widget.addWidget(self.input_form_widget)
+        self.input_form_layout = QtWidgets.QVBoxLayout(self.input_form_widget)
 
-        # Address input
         self.formGroupBox = QtWidgets.QGroupBox("Preencha os campos do traceroute: ")
+        self.input_form_layout.addWidget(self.formGroupBox)
+
         self.address_entry = QtWidgets.QLineEdit()
 
-        # Network device selection
         device_names = [device[0] for device in self.devices]
         self.combo_box = QtWidgets.QComboBox()
         self.combo_box.addItems(device_names)
         self.combo_box.setCurrentText("Escolha um dispositivo: ")
 
-        # IPv4 and IPv6 checkboxes
         self.ipv4_checkbox = QtWidgets.QCheckBox("IPv4")
         self.ipv6_checkbox = QtWidgets.QCheckBox("IPv6")
         self.ipv_layout = QtWidgets.QHBoxLayout()
         self.ipv_layout.addWidget(self.ipv4_checkbox)
         self.ipv_layout.addWidget(self.ipv6_checkbox)
 
-        # UDP, TCP, and ICMP checkboxes
         self.udp_checkbox = QtWidgets.QCheckBox("UDP")
         self.tcp_checkbox = QtWidgets.QCheckBox("TCP")
         self.icmp_checkbox = QtWidgets.QCheckBox("ICMP")
@@ -56,9 +52,7 @@ class TracerouteUI(QtWidgets.QWidget):
         self.protocol_layout.addWidget(self.tcp_checkbox)
         self.protocol_layout.addWidget(self.icmp_checkbox)
 
-        
         self.create_init_form()
-        # Buttons
         self.button_layout = QtWidgets.QHBoxLayout()
         self.button = QtWidgets.QPushButton("Buscar")
         self.button.clicked.connect(self.enviar_dados)
@@ -67,20 +61,25 @@ class TracerouteUI(QtWidgets.QWidget):
         self.advanced_options_button.clicked.connect(self.show_advanced_options)
         self.button_layout.addWidget(self.advanced_options_button)
 
-        self.main_frame_layout.addLayout(self.button_layout)
+        self.input_form_layout.addLayout(self.button_layout)
 
-        # Advanced options UI
+        self.advanced_options_frame = QtWidgets.QWidget()
+        self.advanced_options_frame_layout = QtWidgets.QVBoxLayout(self.advanced_options_frame)
+        self.advanced_options_frame.setVisible(False)
+        self.input_form_layout.addWidget(self.advanced_options_frame)
+
         self.setup_advanced_options()
+
+        # Visualization widget
+        self.visualization_widget = ImageWindow()
+        self.stacked_widget.addWidget(self.visualization_widget)
 
     def create_init_form(self):
         layout = QtWidgets.QFormLayout()
         layout.addRow(QtWidgets.QLabel("Digite um dominio ou endereço ip válido:"), self.address_entry)
         layout.addRow(QtWidgets.QLabel("Escolha um dispositivo de rede: "), self.combo_box)
-       
         layout.addRow(QtWidgets.QLabel("Escolha os protocolos que voce deseja enviar: "), self.protocol_layout)
-
         layout.addRow(QtWidgets.QLabel("Escolha os tipos de protocolo ip: "), self.ipv_layout)
-        self.main_frame_layout.addWidget(self.formGroupBox)
         self.formGroupBox.setLayout(layout)
 
     def create_advanced_form(self):
@@ -108,28 +107,31 @@ class TracerouteUI(QtWidgets.QWidget):
         self.close_button.clicked.connect(self.hide_advanced_options)
         self.advanced_options_frame_layout.addWidget(self.close_button)
 
+    
+   
+    def show_advanced_options(self):
+        self.advanced_options_frame.setVisible(True)
+
+    def hide_advanced_options(self):
+        self.advanced_options_frame.setVisible(False)
+
+
+    def start_traceroute(self, address, ttl, timeout, attempts):
+        self.traceroute_thread = TracerouteThread(address, ttl, timeout, attempts)
+        self.traceroute_thread.update_output_signal.connect(self.visualization_widget.update_output)
+        self.traceroute_thread.add_router_signal.connect(self.visualization_widget.add_router)
+        self.traceroute_thread.start()
+
     def enviar_dados(self):
         selected_item = ([device for device in self.devices if device[0] == self.combo_box.currentText()] or [""])[0]
         address = self.address_entry.text()
         ttl = self.ttl_entry.text()
         timeout = self.timeout_entry.text()
         attempts = self.attempts_entry.text()
-        print("Selected Item:", selected_item)
-        print("Address:", address)
-        print("TTL:", ttl)
-        print("Timeout:", timeout)
-        print("Attempts:", attempts)
         tr.DEVICE_NAME = selected_item[0]
-        # tr.start(address, int(ttl), int(timeout), int(attempts))
-        self.close()
-
-    def show_advanced_options(self):
-        self.main_frame.setVisible(False)
-        self.advanced_options_frame.setVisible(True)
-
-    def hide_advanced_options(self):
-        self.advanced_options_frame.setVisible(False)
-        self.main_frame.setVisible(True)
+        self.start_traceroute(address, int(ttl), int(timeout), int(attempts))
+        self.stacked_widget.setCurrentWidget(self.visualization_widget)
+        self.visualization_widget.clear_scene()
 
 class ImageWindow(QtWidgets.QWidget):
     def __init__(self):
@@ -137,8 +139,8 @@ class ImageWindow(QtWidgets.QWidget):
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowTitle('Image Window')
-        self.setGeometry(200, 200, 800, 600)
+        self.setWindowTitle('Traceroute')
+        self.setGeometry(200, 200, 1000, 700)
 
         self.scroll = QtWidgets.QScrollArea()
         self.scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
@@ -152,27 +154,54 @@ class ImageWindow(QtWidgets.QWidget):
         self.scroll.setWidget(self.graphics_view)
 
         main_layout = QtWidgets.QVBoxLayout(self)
-        main_layout.addWidget(self.scroll)
 
-        self.add_button = QtWidgets.QPushButton("Add Router")
-        self.add_button.clicked.connect(self.add_router)
-        main_layout.addWidget(self.add_button)
+        # Zoom buttons layout
+        zoom_layout = QtWidgets.QVBoxLayout()
+        self.zoom_out_button = QtWidgets.QPushButton("-")
+        self.zoom_out_button.setFixedSize(30, 30)
+        self.zoom_out_button.clicked.connect(self.zoom_out)
+        self.zoom_in_button = QtWidgets.QPushButton("+")
+        self.zoom_in_button.setFixedSize(30, 30)
+        self.zoom_in_button.clicked.connect(self.zoom_in)
+        zoom_layout.addWidget(self.zoom_out_button)
+        zoom_layout.addWidget(self.zoom_in_button)
+        zoom_layout.addStretch()  # Add stretch to push buttons to the top
+
+        # Add the zoom layout and graphics view to a horizontal layout
+        display_layout = QtWidgets.QHBoxLayout()
+        display_layout.addLayout(zoom_layout)
+        display_layout.addWidget(self.scroll)
+
+        main_layout.addLayout(display_layout, stretch=2)  # Increased stretch for console
+
+        self.output_text = QtWidgets.QTextEdit()
+        self.output_text.setReadOnly(True)
+        main_layout.addWidget(self.output_text, stretch=1)  # Increased console area
 
         self.setLayout(main_layout)
-
         self.svg_items = []
-        self.add_initial_router()
 
-    def add_initial_router(self):
+        self.initial_zoom()
+
+    def initial_zoom(self):
+        self.graphics_view.scale(0.5, 0.5)  # Start with a lower zoom
+
+    def zoom_in(self):
+        self.graphics_view.scale(1.2, 1.2)  # Zoom in by 20%
+
+    def zoom_out(self):
+        self.graphics_view.scale(0.8, 0.8)  # Zoom out by 20%
+
+    def add_initial_router(self, description="Você"):
         center_x = self.graphics_view.width() // 2
         center_y = self.graphics_view.height() // 2
         initial_position = self.graphics_view.mapToScene(center_x, center_y)
-        svg_item = self.place_router((initial_position.x(), initial_position.y()), "Você")
+        svg_item = self.place_router((initial_position.x(), initial_position.y()), description, src="./img/desktop.svg")
         self.svg_items.append(svg_item)
         self.center_on_item(svg_item)
 
-    def place_router(self, position, description):
-        svg_item = QtSvg.QGraphicsSvgItem('router.svg')
+    def place_router(self, position, description, src="./img/router.svg"):
+        svg_item = QtSvg.QGraphicsSvgItem(src)
         svg_item.setFlags(QtWidgets.QGraphicsItem.GraphicsItemFlag.ItemIsMovable or 
                           QtWidgets.QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
         svg_item.setPos(position[0], position[1])
@@ -193,22 +222,21 @@ class ImageWindow(QtWidgets.QWidget):
 
         return svg_item
 
-    def add_router(self):
+    def add_router(self, description):
+        last_item = self.svg_items[-1] if self.svg_items else None
+        last_position = last_item.pos() if last_item else QtCore.QPointF(0, 0)
         max_attempts = 100
         for _ in range(max_attempts):
-            last_item = self.svg_items[-1] if self.svg_items else None
-            last_position = last_item.pos() if last_item else QtCore.QPointF(0, 0)
             offset_x = random.randint(-200, 200)
             offset_y = random.randint(-200, 200)
             new_position = (last_position.x() + offset_x, last_position.y() + offset_y)
             if not self.check_collision(new_position):
                 break
         else:
-            print("Failed to place a new router without collision.")
+            self.update_output("Failed to place a new router without collision.")
             return
 
-        new_router_description = f"Router {len(self.svg_items) + 1}"
-        new_svg_item = self.place_router(new_position, new_router_description)
+        new_svg_item = self.place_router(new_position, description)
         self.svg_items.append(new_svg_item)
 
         if last_item:
@@ -233,12 +261,46 @@ class ImageWindow(QtWidgets.QWidget):
     def center_on_item(self, item):
         self.graphics_view.centerOn(item)
 
+    def start_traceroute(self):
+        self.clear_scene()
+        self.add_initial_router()
+        self.parent().start_traceroute(self.parent().address_entry.text(), 
+                                       int(self.parent().ttl_entry.text()), 
+                                       int(self.parent().timeout_entry.text()), 
+                                       int(self.parent().attempts_entry.text()))
+
+    def update_output(self, message):
+        self.output_text.append(message)
+
+    def clear_scene(self):
+        self.output_text.clear()
+        self.svg_items = []
+        self.graphics_scene.clear()
+        self.add_initial_router()
+
+class TracerouteThread(QThread):
+    update_output_signal = pyqtSignal(str)
+    add_router_signal = pyqtSignal(str)
+
+    def __init__(self, address, ttl, timeout, attempts):
+        super().__init__()
+        self.address = address
+        self.ttl = ttl
+        self.timeout = timeout
+        self.attempts = attempts
+
+    def run(self):
+        tr.start(self.address, self.ttl, self.timeout, self.attempts,
+                 update_output=self.update_output, add_router=self.add_router)
+
+    def update_output(self, message):
+        self.update_output_signal.emit(message)
+
+    def add_router(self, description):
+        self.add_router_signal.emit(description)
+
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     traceroute_window = TracerouteUI()
     traceroute_window.show()
-
-    image_window = ImageWindow()
-
-    traceroute_window.button.clicked.connect(image_window.show)
     sys.exit(app.exec_())

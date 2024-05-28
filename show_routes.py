@@ -1,7 +1,7 @@
 from urllib.request import urlopen
 from json import load
 
-def exibir_rota(enderecos):
+def show_routes_print(enderecos):
     routers = []
 
     for endereco in enderecos:
