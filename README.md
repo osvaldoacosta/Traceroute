@@ -27,7 +27,7 @@ sudo python graphical_interface.py
   - [x] ICMP
   - [ ] TCP
 - [ ] Adicionar suporte ao ipv6 e ipv4
-
+- [ ] Adicionar suporte ao windows
 ### Dependencias:
 
 - pyqt
