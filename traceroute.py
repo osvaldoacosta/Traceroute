@@ -1,15 +1,16 @@
 #!/usr/bin/env python
 
 import socket
-from show_routes import address_info, show_routes_print
+from packet_creation import create_icmp_packet, create_udp_packet, create_udp_packet
+from show_routes import address_info
 import socket_creation
 import time
-global DEVICE_NAME
+from util import get_website
+
+DEVICE_NAME:str
 
 
-
-
-def tracer(srec, ssend, port, ttl, destination_address, timeout, update_output):
+def tracer(srec,  port, ttl, destination_address, timeout, update_output):
     busca = ""
     hasEnded = False
 
@@ -31,41 +32,42 @@ def tracer(srec, ssend, port, ttl, destination_address, timeout, update_output):
             busca += "* "
         finally:
             srec.close()
-            ssend.close()
 
             if not hasEnded:
                 resend_msg(destination_address, port, ttl, timeout)
 
-    return busca, define_addr(busca),ping_time
+    return busca,ping_time
 
 
-def resend_msg(alvo, port, ttl, timeout):
+def resend_msg(destination_address, port, ttl, timeout):
     socket_recv = socket_creation.create_icmp_receive_socket(port,timeout,DEVICE_NAME)
-    socket_sender = socket_creation.create_udp_send_socket(ttl)
-    socket_sender.sendto(b'Tapioca!', (alvo, port))
-
+    socket_sender = send_udp(ttl,port,destination_address)
+    
     return socket_recv, socket_sender
 
 
-def define_addr(busca):
-    busca = busca.strip("* ")
+def send_udp(ttl, port, destination_address,timeout=None):
+    ssnd = socket_creation.create_udp_send_socket(ttl)
+    udp_packet = create_udp_packet(port)
+    ssnd.sendto(udp_packet, (destination_address, port))
+    return ssnd
 
-    addr = "*" if busca == "" else busca
+def send_icmp(ttl, port, destination_address, timeout):
+    ssnd = socket_creation.create_icmp_send_socket(ttl,timeout)
+    icmp_packet = create_icmp_packet(ttl)
 
-    return addr
+    ssnd.sendto(icmp_packet, (destination_address,0))
+     
 
-
-    
-def show_routes(addresses, update_output, add_router):
-    for address in addresses:
-        if address != "*":
-            update_output(f"Connected to: {address}")
-            add_router(address)
-        else:
-            update_output(f"Timeout or unreachable: {address}")
-
-
-def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, update_output=None, add_router=None, with_location=False):
+def send_tcp(ttl, port, destination_address, timeout=None):
+    ssnd = socket_creation.create_tcp_send_socket(ttl)
+    try:
+        if ssnd:
+            ssnd.connect((destination_address, port))
+    except socket.error as e:
+        print(f"TCP connection error with TTL {ttl}: {e}")
+    return ssnd
+def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, update_output=None, add_router=None, with_location=False, protocol=None):
     ttl = 1
     rejections = 0
     addresses = []
@@ -73,17 +75,32 @@ def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, u
 
     total_time:float= 0.0
 
+
+    send_function = None
+
+    if protocol == "UDP":
+        send_function = send_udp
+    elif protocol == "ICMP":
+        send_function = send_icmp
+    else :
+        send_function = send_tcp
+
+    if not send_function:
+        return
+    
     while ttl < max_hops:
         srec = socket_creation.create_icmp_receive_socket(port, timeout, DEVICE_NAME)
-        ssnd = socket_creation.create_udp_send_socket(ttl)
 
-        ssnd.sendto(b'Tapioca', (destination_address, port))
+        ssend = send_function(ttl,port, destination_address, timeout)
+
 
         if update_output:
             update_output(f"\nTTL: {ttl}")
 
-        tries, addr,ping_time= tracer(srec, ssnd, port, ttl, destination_address, timeout, update_output)
+        addr,ping_time= tracer(srec, port, ttl, destination_address, timeout, update_output)
 
+        if ssend:
+            ssend.close()
         total_time = total_time + ping_time
 
         addr_w_ping = f"{addr}\n({ping_time:.2f} ms)" if ping_time else addr
@@ -95,9 +112,11 @@ def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, u
             addr_description = addr_w_ping
 
         if update_output:
-            update_output(f"Tentativa no endereço: {tries}")
+            update_output(f"Tentativa no endereço: {addr}")
 
-        if addr == "*":
+        if "*" in addr:
+            if update_output:
+                update_output(f"Timeout excedido ou roteador inalcançável")
             rejections += 1
         else:
             rejections = 0
@@ -115,17 +134,14 @@ def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, u
     if update_output:
         update_output(f"Rota concluída: {addresses}")
 
-    try:
-        show_routes(addresses)
-    except Exception as error:
-        if update_output:
-            update_output(f"Houve um erro ao tentar rastrear a rota: {error}")
 
-def start(website_address, ttl=60, timeout=3, max_rejections=15, update_output=None, add_router=None, with_geoinfo=False):
-    website, website_address = socket_creation.get_website(website_address)
+def start(website_address, ttl=60, timeout=3, max_rejections=15, update_output=None, add_router=None, with_geoinfo=False, protocols=[]):
+    website, website_address = get_website(website_address)
 
     if update_output:
         update_output(f"Destino: {website} ({website_address})")
 
-    traceroute(website_address, max_hops=ttl, timeout=timeout, max_rejections=max_rejections,
-               update_output=update_output, add_router=add_router, with_location=with_geoinfo)
+    for prot in protocols:
+        traceroute(website_address, max_hops=ttl, timeout=timeout, max_rejections=max_rejections,
+               update_output=update_output, add_router=add_router, with_location=with_geoinfo, protocol=prot)
+

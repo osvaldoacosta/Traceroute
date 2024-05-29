@@ -2,7 +2,7 @@ from PyQt5 import QtWidgets, QtGui, QtCore, QtSvg
 from PyQt5.QtCore import QThread, pyqtSignal
 import sys
 import random
-from detectDevice import get_active_devices
+from util import get_active_devices
 import traceroute as tr
 
 
@@ -130,8 +130,8 @@ class TracerouteUI(QtWidgets.QWidget):
         self.advanced_options_frame.setVisible(False)
 
 
-    def start_traceroute(self, address, ttl, timeout, attempts, with_geoinfo):
-        self.traceroute_thread = TracerouteThread(address, ttl, timeout, attempts, with_geoinfo)
+    def start_traceroute(self, address, ttl, timeout, attempts, with_geoinfo, protocols):
+        self.traceroute_thread = TracerouteThread(address, ttl, timeout, attempts, with_geoinfo, protocols)
         self.traceroute_thread.update_output_signal.connect(self.visualization_widget.update_output)
         self.traceroute_thread.add_router_signal.connect(self.visualization_widget.add_router)
         self.traceroute_thread.start()
@@ -143,10 +143,22 @@ class TracerouteUI(QtWidgets.QWidget):
         timeout = self.timeout_entry.text()
         attempts = self.attempts_entry.text()
         with_geoinfo = self.radio_sim.isChecked()
+      
+        isUDP = self.udp_checkbox.isChecked()
+        isTCP = self.tcp_checkbox.isChecked()
+        isICMP= self.icmp_checkbox.isChecked()
+           
+        protocols = []
+        if isUDP:
+            protocols.append("UDP")
+        if isTCP:
+            protocols.append("TCP")
+        if isICMP:
+            protocols.append("ICMP")
        
-            
+        print(protocols)
         tr.DEVICE_NAME = selected_item[0]
-        self.start_traceroute(address, int(ttl), int(timeout), int(attempts),with_geoinfo)
+        self.start_traceroute(address, int(ttl), int(timeout), int(attempts),with_geoinfo, protocols)
         self.stacked_widget.setCurrentWidget(self.visualization_widget)
         self.visualization_widget.clear_scene()
 
@@ -295,11 +307,6 @@ class ImageWindow(QtWidgets.QWidget):
     def start_traceroute(self):
         self.clear_scene()
         self.add_initial_router()
-        address_futures = self.parent().start_traceroute(
-            self.parent().address_entry.text(), 
-            int(self.parent().ttl_entry.text()), 
-            int(self.parent().timeout_entry.text()), 
-            int(self.parent().attempts_entry.text()))
 
 
     def update_output(self, message):
@@ -315,17 +322,18 @@ class TracerouteThread(QThread):
     update_output_signal = pyqtSignal(str)
     add_router_signal = pyqtSignal(str)
 
-    def __init__(self, address, ttl, timeout, attempts, with_geoinfo):
+    def __init__(self, address, ttl, timeout, attempts, with_geoinfo, protocols):
         super().__init__()
         self.address = address
         self.ttl = ttl
         self.timeout = timeout
         self.attempts = attempts
         self.with_geoinfo = with_geoinfo
-    
+        self.protocols = protocols
+
     def run(self):
         tr.start(self.address, self.ttl, self.timeout, self.attempts,
-                 update_output=self.update_output, add_router=self.add_router, with_geoinfo=self.with_geoinfo)
+                 update_output=self.update_output, add_router=self.add_router, with_geoinfo=self.with_geoinfo, protocols=self.protocols)
 
     def update_output(self, message):
         self.update_output_signal.emit(message)

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import socket
 import psutil
 
 def get_active_devices():
@@ -15,3 +16,13 @@ def get_active_devices():
                         active_devices.append((interface, addr.address))
     return active_devices
 
+
+def get_website(site_addr=""):
+    site = site_addr
+    try:
+        site_addr = socket.gethostbyname(site_addr)
+        print(site, site_addr)
+    except socket.error:
+        return [site_addr,None]
+
+    return [site, site_addr]
