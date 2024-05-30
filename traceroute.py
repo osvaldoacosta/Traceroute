@@ -67,15 +67,15 @@ def send_tcp(ttl, port, destination_address, timeout=None):
             ssnd.connect((destination_address, port))
         print("TCP connected to: ",destination_address)
     except socket.error as e:
-        if e.errno == 115:  # errno 115 é o erro 'Operation now in progress'
+        if e.errno == 115 or e.errno == 10035:  # errno 115(linux) e 10035(windows) é o erro 'Operation now in progress'
             '''
             Segundo a documentação:
             "The socket is nonblocking and the connection cannot be completed 
             immediately."
             '''
-            # isso é normal para um socket não bloqueante, e já que 
-            # isso não influencia no funcionamento do traceroute, pois ele completa quando estiver disponivel para escrita
-            # Deixaremos dessa forma, ignorando esse erro. Poderiamos usar o pool ou o select, porém aumentaria a complexidade do código
+            # isso é normal para um socket não bloqueante, e já que isso não influencia no funcionamento do traceroute,
+            # pois ele completa quando estiver disponivel para escrita Deixaremos dessa forma,
+            # ignorando esse erro. Poderiamos usar o pool ou o select, porém aumentaria a complexidade do código
             pass
         #Pega todos os outros erros
         else: print(f"TCP connection error with TTL {ttl}: {e}")

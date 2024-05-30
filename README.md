@@ -1,6 +1,5 @@
 ## Traceroute
 
-
 Para rodar com interface grafica rode com privilegios de administrador
 
 ```
@@ -14,15 +13,17 @@ sudo python graphical_interface.py
   - [x] Adaptar codigo do traceroute cli para gui
   - [x] Representação dos roteadores de maneira grafica
   - [x] Adicionar os roteadores on the go, ao realizar os hops
+- [ ] Mostrar na mesma tela os diferentes hops dos roteadores de diferentes protocolos
 - [x] Fazer com que os botoes dos protocolos do gui funcionem
 - [x] Tentar integrar o ping com traceroute
 - [x] Usar mais de uma thread
-- [ ] Realizar envio de pacotes:
+- [x] Realizar envio de pacotes:
   - [x] UDP
   - [x] ICMP
-  - [ ] TCP
-- [ ] Adicionar suporte ao ipv6 e ipv4
-- [ ] Adicionar suporte ao windows
+  - [x] TCP
+- [ ] Adicionar suporte ao ipv6
+- [x] Adicionar suporte ao windows
+
 ### Dependencias:
 
 - pyqt
