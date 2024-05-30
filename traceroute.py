@@ -6,6 +6,7 @@ from show_routes import address_info
 import socket_creation
 import time
 from util import get_website
+import select
 
 DEVICE_NAME:str
 
@@ -64,9 +65,23 @@ def send_tcp(ttl, port, destination_address, timeout=None):
     try:
         if ssnd:
             ssnd.connect((destination_address, port))
+        print("TCP connected to: ",destination_address)
     except socket.error as e:
-        print(f"TCP connection error with TTL {ttl}: {e}")
+        if e.errno == 115:  # errno 115 é o erro 'Operation now in progress'
+            '''
+            Segundo a documentação:
+            "The socket is nonblocking and the connection cannot be completed 
+            immediately."
+            '''
+            # isso é normal para um socket não bloqueante, e já que 
+            # isso não influencia no funcionamento do traceroute, pois ele completa quando estiver disponivel para escrita
+            # Deixaremos dessa forma, ignorando esse erro. Poderiamos usar o pool ou o select, porém aumentaria a complexidade do código
+            pass
+        #Pega todos os outros erros
+        else: print(f"TCP connection error with TTL {ttl}: {e}")
+    
     return ssnd
+
 def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, update_output=None, add_router=None, with_location=False, protocol=None):
     ttl = 1
     rejections = 0
@@ -90,6 +105,7 @@ def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, u
     
     while ttl < max_hops:
         srec = socket_creation.create_icmp_receive_socket(port, timeout, DEVICE_NAME)
+
 
         ssend = send_function(ttl,port, destination_address, timeout)
 

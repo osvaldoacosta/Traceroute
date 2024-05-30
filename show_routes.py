@@ -2,14 +2,6 @@ from urllib.request import urlopen
 from json import load
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-def show_routes_print(enderecos):
-    routers = []
-
-    for endereco in enderecos:
-        router = address_info(endereco)
-        routers.append(router)
-
-    print(f"Rota percorrida:\n{' -> '.join(routers)}")
 
 def address_info(address): 
     data = ipInfo(address)
