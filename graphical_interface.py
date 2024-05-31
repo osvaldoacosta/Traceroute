@@ -1,3 +1,4 @@
+from time import sleep
 from PyQt5 import QtWidgets, QtGui, QtCore, QtSvg
 from PyQt5.QtCore import QPointF, QThread, Qt, pyqtSignal
 import sys
@@ -41,18 +42,24 @@ class TracerouteUI(QtWidgets.QWidget):
         self.ipv4_radio= QtWidgets.QRadioButton("IPv4")
         self.ipv6_radio= QtWidgets.QRadioButton("IPv6")
         self.ipv_layout = QtWidgets.QHBoxLayout()
-        self.ipv4_radio.click()
         self.ipv_layout.addWidget(self.ipv4_radio)
         self.ipv_layout.addWidget(self.ipv6_radio)
+        self.ipv_button_group = QtWidgets.QButtonGroup()
+        self.ipv4_radio.click()
+        self.ipv_button_group.addButton(self.ipv4_radio)
+        self.ipv_button_group.addButton(self.ipv6_radio)
 
-        self.radio_layout = QtWidgets.QHBoxLayout()
+        self.radio_button_group = QtWidgets.QButtonGroup()
          
+        self.radio_layout = QtWidgets.QHBoxLayout()
         self.radio_sim = QtWidgets.QRadioButton('Sim')
         self.radio_nao = QtWidgets.QRadioButton('Não')
         self.radio_nao.click()
+        self.radio_button_group.addButton(self.radio_sim)
+        self.radio_button_group.addButton(self.radio_nao)
         self.radio_layout.addWidget(self.radio_sim)
         self.radio_layout.addWidget(self.radio_nao)
-
+        
         self.udp_checkbox = QtWidgets.QCheckBox("UDP")
         self.tcp_checkbox = QtWidgets.QCheckBox("TCP")
         self.icmp_checkbox = QtWidgets.QCheckBox("ICMP")
@@ -272,22 +279,17 @@ class ImageWindow(QtWidgets.QWidget):
         return svg_item
 
     
-    def add_router(self, address_info,protocol):
-        print(protocol)
-        print("color", self.arrowColors[protocol])
-        parts = address_info.splitlines(0)
-        address = parts[0]  # TODO: Remover essa gambiarra enfadonha dps
-        ping_time = parts[1] if len(parts) > 1 else None  # TODO:Remover a gambiarra enfadonha 2
+    def add_router(self, address_info,ping_time,protocol):
         last_item = self.svg_items[-1] if self.svg_items else None
 
-        if address in self.router_positions and "*" not in address_info:
-            new_position = self.router_positions[address]
+        if address_info in self.router_positions and "*" not in address_info:
+            new_position = self.router_positions[address_info]
         else:
             last_position = last_item.pos() if last_item else QtCore.QPointF(0, 0)
             max_attempts = 100
             for _ in range(max_attempts):
-                offset_x = random.randint(-300, 300)
-                offset_y = random.randint(-300, 300)
+                offset_x = random.randint(-500, 500)
+                offset_y = random.randint(-500, 500)
                 new_position = (last_position.x() + offset_x, last_position.y() + offset_y)
                 if not self.check_collision(new_position):
                     break
@@ -295,10 +297,10 @@ class ImageWindow(QtWidgets.QWidget):
                 self.update_output("Failed to place a new router without collision.")
                 return
 
-            self.router_positions[address] = new_position
+            self.router_positions[address_info] = new_position
 
         unreachable = "*" in address_info
-        new_svg_item = self.place_router(new_position, address, unreachable=unreachable)
+        new_svg_item = self.place_router(new_position, address_info, unreachable=unreachable)
         self.svg_items.append(new_svg_item)
 
         if last_item:
@@ -388,7 +390,7 @@ class ImageWindow(QtWidgets.QWidget):
 
 class TracerouteThread(QThread):
     update_output_signal = pyqtSignal(str)
-    add_router_signal = pyqtSignal(str,str)
+    add_router_signal = pyqtSignal(str,str,str)
     protocol_start_signal = pyqtSignal()
 
 
@@ -408,13 +410,14 @@ class TracerouteThread(QThread):
                     update_output=self.update_output, add_router=self.add_router, with_geoinfo=self.with_geoinfo,
                     protocol=protocol,isIPV6=self.isIPV6)
 
+            sleep(3) #TODO: DESCOBRIR O PQ DISSO FUNCIONAR
             self.protocol_start_signal.emit()
 
     def update_output(self, message):
         self.update_output_signal.emit(message)
 
-    def add_router(self, description,protocol):
-        self.add_router_signal.emit(description,protocol)
+    def add_router(self, description,ping_time,protocol):
+        self.add_router_signal.emit(description,ping_time,protocol)
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)

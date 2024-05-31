@@ -108,6 +108,7 @@ def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, u
         srec = socket_creation.create_icmp_receive_socket(port, timeout, DEVICE_NAME, isIPV6=isIPV6)
         ssend = send_function(ttl,port, destination_address, timeout,isIPV6)
 
+        addr_info = ""
 
         if update_output:
             update_output(f"\nTTL: {ttl}")
@@ -116,13 +117,10 @@ def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, u
 
         total_time = total_time + ping_time
 
-        addr_w_ping = f"{addr}\n({ping_time:.2f} ms)" if ping_time else addr
         
         if with_location:
             addr_info = address_info(addr)
-            addr_description = f"{addr_w_ping}\n{addr_info}"
-        else:
-            addr_description = addr_w_ping
+        
 
         if update_output:
             update_output(f"Tentativa no endereço: {addr}")
@@ -136,7 +134,9 @@ def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, u
             rejections = 0
       
         if add_router:
-            add_router(addr_description,protocol)
+            ping_time_str = f"{ping_time:.2f}ms"
+            address_with_info = f"{addr}\n{addr_info}"
+            add_router(address_with_info,ping_time_str,protocol)
 
         addresses.append(addr)
 
