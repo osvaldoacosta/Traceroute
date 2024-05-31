@@ -11,7 +11,7 @@ import select
 DEVICE_NAME:str
 
 
-def tracer(srec,  port, ttl, destination_address, timeout, update_output):
+def tracer(srec,ssend,  port, ttl, destination_address, timeout, update_output):
     busca = ""
     hasEnded = False
 
@@ -33,6 +33,7 @@ def tracer(srec,  port, ttl, destination_address, timeout, update_output):
             busca += "* "
         finally:
             srec.close()
+            ssend.close()
 
             if not hasEnded:
                 resend_msg(destination_address, port, ttl, timeout)
@@ -42,13 +43,13 @@ def tracer(srec,  port, ttl, destination_address, timeout, update_output):
 
 def resend_msg(destination_address, port, ttl, timeout):
     socket_recv = socket_creation.create_icmp_receive_socket(port,timeout,DEVICE_NAME)
-    socket_sender = send_udp(ttl,port,destination_address)
+    socket_sender = send_udp(ttl,port,destination_address,timeout)
     
     return socket_recv, socket_sender
 
 
-def send_udp(ttl, port, destination_address,timeout=None):
-    ssnd = socket_creation.create_udp_send_socket(ttl)
+def send_udp(ttl, port, destination_address,timeout):
+    ssnd = socket_creation.create_udp_send_socket(ttl,timeout)
     udp_packet = create_udp_packet(port)
     ssnd.sendto(udp_packet, (destination_address, port))
     return ssnd
@@ -58,10 +59,10 @@ def send_icmp(ttl, port, destination_address, timeout):
     icmp_packet = create_icmp_packet(ttl)
 
     ssnd.sendto(icmp_packet, (destination_address,0))
-     
+    return ssnd 
 
-def send_tcp(ttl, port, destination_address, timeout=None):
-    ssnd = socket_creation.create_tcp_send_socket(ttl)
+def send_tcp(ttl, port, destination_address, timeout):
+    ssnd = socket_creation.create_tcp_send_socket(ttl,timeout)
     try:
         if ssnd:
             ssnd.connect((destination_address, port))
@@ -82,10 +83,13 @@ def send_tcp(ttl, port, destination_address, timeout=None):
     
     return ssnd
 
-def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, update_output=None, add_router=None, with_location=False, protocol=None):
+def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, update_output=None, add_router=None, with_location=False, protocol="UDP"):
     ttl = 1
     rejections = 0
     addresses = []
+
+    
+
     port = 33434
 
     total_time:float= 0.0
@@ -105,18 +109,14 @@ def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, u
     
     while ttl < max_hops:
         srec = socket_creation.create_icmp_receive_socket(port, timeout, DEVICE_NAME)
-
-
         ssend = send_function(ttl,port, destination_address, timeout)
 
 
         if update_output:
             update_output(f"\nTTL: {ttl}")
 
-        addr,ping_time= tracer(srec, port, ttl, destination_address, timeout, update_output)
+        addr,ping_time= tracer(srec, ssend, port, ttl, destination_address, timeout, update_output)
 
-        if ssend:
-            ssend.close()
         total_time = total_time + ping_time
 
         addr_w_ping = f"{addr}\n({ping_time:.2f} ms)" if ping_time else addr
@@ -131,6 +131,7 @@ def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, u
             update_output(f"Tentativa no endereço: {addr}")
 
         if "*" in addr:
+            total_time += timeout*1000
             if update_output:
                 update_output(f"Timeout excedido ou roteador inalcançável")
             rejections += 1
@@ -138,7 +139,7 @@ def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, u
             rejections = 0
       
         if add_router:
-            add_router(addr_description)
+            add_router(addr_description,protocol)
 
         addresses.append(addr)
 
@@ -148,16 +149,17 @@ def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, u
         ttl += 1
 
     if update_output:
+        print("Tempo total para o protocolo ",protocol,": ",total_time/1000,"s")
         update_output(f"Rota concluída: {addresses}")
+        update_output(f"Tempo total para o protocolo {protocol} : {total_time/1000:.2f} s")
 
 
-def start(website_address, ttl=60, timeout=3, max_rejections=15, update_output=None, add_router=None, with_geoinfo=False, protocols=[]):
+def start(website_address, ttl=60, timeout=3, max_rejections=15, update_output=None, add_router=None, with_geoinfo=False, protocol="UDP", isIPV6=True):
     website, website_address = get_website(website_address)
 
     if update_output:
         update_output(f"Destino: {website} ({website_address})")
 
-    for prot in protocols:
-        traceroute(website_address, max_hops=ttl, timeout=timeout, max_rejections=max_rejections,
-               update_output=update_output, add_router=add_router, with_location=with_geoinfo, protocol=prot)
+    traceroute(website_address, max_hops=ttl, timeout=timeout, max_rejections=max_rejections,
+               update_output=update_output, add_router=add_router, with_location=with_geoinfo, protocol=protocol)
 

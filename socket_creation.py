@@ -22,13 +22,15 @@ def create_icmp_send_socket(ttl, timeout):
     ssnd.settimeout(timeout)
     return ssnd
 
-def create_udp_send_socket(ttl):
+def create_udp_send_socket(ttl,timeout):
     ssnd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     ssnd.setsockopt(socket.IPPROTO_IP, socket.IP_TTL, ttl)
+    ssnd.settimeout(timeout)
     return ssnd
 
-def create_tcp_send_socket(ttl):
+def create_tcp_send_socket(ttl, timeout):
     ssnd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     ssnd.setsockopt(socket.IPPROTO_IP, socket.IP_TTL, ttl)
+    ssnd.settimeout(timeout)
     ssnd.setblocking(False)
     return ssnd
