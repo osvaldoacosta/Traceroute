@@ -11,7 +11,7 @@ import select
 DEVICE_NAME:str
 
 
-def tracer(srec,ssend,  port, ttl, destination_address, timeout, update_output):
+def tracer(srec,ssend,  port, ttl, destination_address, timeout, update_output, isIPV6):
     busca = ""
     hasEnded = False
 
@@ -36,33 +36,33 @@ def tracer(srec,ssend,  port, ttl, destination_address, timeout, update_output):
             ssend.close()
 
             if not hasEnded:
-                resend_msg(destination_address, port, ttl, timeout)
+                resend_msg(destination_address, port, ttl, timeout,isIPV6)
 
     return busca,ping_time
 
 
-def resend_msg(destination_address, port, ttl, timeout):
-    socket_recv = socket_creation.create_icmp_receive_socket(port,timeout,DEVICE_NAME)
-    socket_sender = send_udp(ttl,port,destination_address,timeout)
+def resend_msg(destination_address, port, ttl, timeout,isIPV6):
+    socket_recv = socket_creation.create_icmp_receive_socket(port,timeout,DEVICE_NAME,isIPV6)
+    socket_sender = send_udp(ttl,port,destination_address,timeout,isIPV6)
     
     return socket_recv, socket_sender
 
 
-def send_udp(ttl, port, destination_address,timeout):
-    ssnd = socket_creation.create_udp_send_socket(ttl,timeout)
+def send_udp(ttl, port, destination_address,timeout,isIPV6):
+    ssnd = socket_creation.create_udp_send_socket(ttl,timeout,isIPV6)
     udp_packet = create_udp_packet(port)
     ssnd.sendto(udp_packet, (destination_address, port))
     return ssnd
 
-def send_icmp(ttl, port, destination_address, timeout):
-    ssnd = socket_creation.create_icmp_send_socket(ttl,timeout)
-    icmp_packet = create_icmp_packet(ttl)
+def send_icmp(ttl, port, destination_address, timeout,isIPV6):
+    ssnd = socket_creation.create_icmp_send_socket(ttl,timeout,isIPV6)
+    icmp_packet = create_icmp_packet(ttl,isIPV6)
 
     ssnd.sendto(icmp_packet, (destination_address,0))
     return ssnd 
 
-def send_tcp(ttl, port, destination_address, timeout):
-    ssnd = socket_creation.create_tcp_send_socket(ttl,timeout)
+def send_tcp(ttl, port, destination_address, timeout,isIPV6):
+    ssnd = socket_creation.create_tcp_send_socket(ttl,timeout,isIPV6)
     try:
         if ssnd:
             ssnd.connect((destination_address, port))
@@ -83,17 +83,14 @@ def send_tcp(ttl, port, destination_address, timeout):
     
     return ssnd
 
-def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, update_output=None, add_router=None, with_location=False, protocol="UDP"):
+def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, update_output=None, add_router=None, with_location=False, protocol="UDP", isIPV6=False):
     ttl = 1
     rejections = 0
     addresses = []
 
-    
-
     port = 33434
 
     total_time:float= 0.0
-
 
     send_function = None
 
@@ -108,14 +105,14 @@ def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, u
         return
     
     while ttl < max_hops:
-        srec = socket_creation.create_icmp_receive_socket(port, timeout, DEVICE_NAME)
-        ssend = send_function(ttl,port, destination_address, timeout)
+        srec = socket_creation.create_icmp_receive_socket(port, timeout, DEVICE_NAME, isIPV6=isIPV6)
+        ssend = send_function(ttl,port, destination_address, timeout,isIPV6)
 
 
         if update_output:
             update_output(f"\nTTL: {ttl}")
 
-        addr,ping_time= tracer(srec, ssend, port, ttl, destination_address, timeout, update_output)
+        addr,ping_time= tracer(srec, ssend, port, ttl, destination_address, timeout, update_output,isIPV6)
 
         total_time = total_time + ping_time
 
@@ -154,12 +151,12 @@ def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, u
         update_output(f"Tempo total para o protocolo {protocol} : {total_time/1000:.2f} s")
 
 
-def start(website_address, ttl=60, timeout=3, max_rejections=15, update_output=None, add_router=None, with_geoinfo=False, protocol="UDP", isIPV6=True):
-    website, website_address = get_website(website_address)
+def start(website_address, ttl=60, timeout=3, max_rejections=15, update_output=None, add_router=None, with_geoinfo=False, protocol="UDP", isIPV6=False):
+    website, website_address = get_website(website_address, isIPV6)
 
     if update_output:
         update_output(f"Destino: {website} ({website_address})")
 
     traceroute(website_address, max_hops=ttl, timeout=timeout, max_rejections=max_rejections,
-               update_output=update_output, add_router=add_router, with_location=with_geoinfo, protocol=protocol)
+               update_output=update_output, add_router=add_router, with_location=with_geoinfo, protocol=protocol, isIPV6=isIPV6)
 

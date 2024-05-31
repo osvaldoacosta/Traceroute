@@ -17,7 +17,7 @@ def get_active_devices():
     return active_devices
 
 
-def get_website(site_addr="", isIPV6=False):
+def get_website(isIPV6, site_addr="", ):
     site = site_addr
     if isIPV6:
         try:
@@ -26,7 +26,6 @@ def get_website(site_addr="", isIPV6=False):
             if info:
                 for result in info:
                     ipv6_address = result[4][0]
-                    print(ipv6_address)
                     return [site, ipv6_address]
             
             return "No IPv6 address found."

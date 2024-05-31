@@ -5,7 +5,6 @@ import struct
 
 FLAG = "TAPIOCA!"
 
-
 def create_icmp_packet(ttl, isIPV6):
     if isIPV6:
         icmp_type = 128  # Echo Request para ICMPv6
@@ -31,6 +30,7 @@ def create_icmp_packet(ttl, isIPV6):
 
     icmp_packet = header + data
     return icmp_packet
+
 
 
 def icmp_checksum(data):

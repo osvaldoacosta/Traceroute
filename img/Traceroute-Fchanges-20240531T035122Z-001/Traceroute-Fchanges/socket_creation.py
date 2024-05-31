@@ -3,7 +3,6 @@
 import platform
 import socket
 
-
 def create_icmp_receive_socket(port, timeout, device_name, isIPV6):
     if platform.system() == 'Windows':
         if isIPV6:
@@ -23,7 +22,6 @@ def create_icmp_receive_socket(port, timeout, device_name, isIPV6):
         
     return socket_rec_icmp
 
-
 def create_icmp_send_socket(ttl, timeout, isIPV6):
     if isIPV6:
         ssnd = socket.socket(socket.AF_INET6, socket.SOCK_RAW, socket.IPPROTO_ICMPV6)
@@ -34,19 +32,16 @@ def create_icmp_send_socket(ttl, timeout, isIPV6):
     ssnd.settimeout(timeout)
     return ssnd
 
-
-def create_udp_send_socket(ttl,timeout, isIPV6):
+def create_udp_send_socket(ttl, isIPV6):
     if isIPV6:
         ssnd = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         ssnd.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_UNICAST_HOPS, ttl)
     else:
         ssnd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         ssnd.setsockopt(socket.IPPROTO_IP, socket.IP_TTL, ttl)
-
-    ssnd.settimeout(timeout)
     return ssnd
 
-def create_tcp_send_socket(ttl,timeout, isIPV6):
+def create_tcp_send_socket(ttl, isIPV6):
     if isIPV6:
         ssnd = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         ssnd.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_UNICAST_HOPS, ttl)
@@ -54,5 +49,4 @@ def create_tcp_send_socket(ttl,timeout, isIPV6):
         ssnd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         ssnd.setsockopt(socket.IPPROTO_IP, socket.IP_TTL, ttl)
     ssnd.setblocking(False)
-    ssnd.settimeout(timeout)
     return ssnd

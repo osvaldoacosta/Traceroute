@@ -1,10 +1,10 @@
 from PyQt5 import QtWidgets, QtGui, QtCore, QtSvg
-from PyQt5.QtCore import QPointF, QThread, Qt, pyqtSignal
+from PyQt5.QtCore import QThread, pyqtSignal
 import sys
 import random
 from util import get_active_devices
 import traceroute as tr
-import math
+
 
 
 class TracerouteUI(QtWidgets.QWidget):
@@ -38,12 +38,12 @@ class TracerouteUI(QtWidgets.QWidget):
         self.combo_box.addItems(device_names)
         self.combo_box.setCurrentText("Escolha um dispositivo: ")
 
-        self.ipv4_radio= QtWidgets.QRadioButton("IPv4")
-        self.ipv6_radio= QtWidgets.QRadioButton("IPv6")
+        self.ipv4_checkbox = QtWidgets.QCheckBox("IPv4")
+        self.ipv6_checkbox = QtWidgets.QCheckBox("IPv6")
         self.ipv_layout = QtWidgets.QHBoxLayout()
-        self.ipv4_radio.click()
-        self.ipv_layout.addWidget(self.ipv4_radio)
-        self.ipv_layout.addWidget(self.ipv6_radio)
+        self.ipv4_checkbox.click()
+        self.ipv_layout.addWidget(self.ipv4_checkbox)
+        self.ipv_layout.addWidget(self.ipv6_checkbox)
 
         self.radio_layout = QtWidgets.QHBoxLayout()
          
@@ -90,7 +90,7 @@ class TracerouteUI(QtWidgets.QWidget):
         layout.addRow(QtWidgets.QLabel("Digite um dominio ou endereço ip válido:"), self.address_entry)
         layout.addRow(QtWidgets.QLabel("Escolha um dispositivo de rede: "), self.combo_box)
         layout.addRow(QtWidgets.QLabel("Escolha os protocolos que voce deseja enviar: "), self.protocol_layout)
-        layout.addRow(QtWidgets.QLabel("Escolha um tipo de protocolo ip: "), self.ipv_layout)
+        layout.addRow(QtWidgets.QLabel("Escolha os tipos de protocolo ip: "), self.ipv_layout)
        
         layout.addRow(QtWidgets.QLabel("Você deseja visualizar a posição geográfica dos roteadores? : "), self.radio_layout)
 
@@ -130,11 +130,10 @@ class TracerouteUI(QtWidgets.QWidget):
         self.advanced_options_frame.setVisible(False)
 
 
-    def start_traceroute(self, address, ttl, timeout, attempts, with_geoinfo, protocols,isIPV6):
-        self.traceroute_thread = TracerouteThread(address, ttl, timeout, attempts, with_geoinfo, protocols, isIPV6)
+    def start_traceroute(self, address, ttl, timeout, attempts, with_geoinfo, protocols):
+        self.traceroute_thread = TracerouteThread(address, ttl, timeout, attempts, with_geoinfo, protocols)
         self.traceroute_thread.update_output_signal.connect(self.visualization_widget.update_output)
         self.traceroute_thread.add_router_signal.connect(self.visualization_widget.add_router)
-        self.traceroute_thread.protocol_start_signal.connect(self.visualization_widget.on_protocol_start)
         self.traceroute_thread.start()
 
     def enviar_dados(self):
@@ -156,10 +155,10 @@ class TracerouteUI(QtWidgets.QWidget):
             protocols.append("TCP")
         if isICMP:
             protocols.append("ICMP")
-      
-        isIPV6 = self.ipv6_radio.isChecked()
+       
+        print(protocols)
         tr.DEVICE_NAME = selected_item[0]
-        self.start_traceroute(address, int(ttl), int(timeout), int(attempts),with_geoinfo, protocols, isIPV6)
+        self.start_traceroute(address, int(ttl), int(timeout), int(attempts),with_geoinfo, protocols)
         self.stacked_widget.setCurrentWidget(self.visualization_widget)
         self.visualization_widget.clear_scene()
 
@@ -167,13 +166,6 @@ class ImageWindow(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         self.init_ui()
-        self.router_positions = {} # Ele usa o endereço do roteador como chave e o valor seria a posição na tela
-        self.hasAlreadyStarted = False
-        self.arrowColors = {
-                "TCP": QtCore.Qt.GlobalColor.blue,
-                "UDP": QtCore.Qt.GlobalColor.red,
-                "ICMP": QtCore.Qt.GlobalColor.green,
-        } 
 
     def init_ui(self):
         self.setWindowTitle('Traceroute')
@@ -229,20 +221,13 @@ class ImageWindow(QtWidgets.QWidget):
     def zoom_out(self):
         self.graphics_view.scale(0.8, 0.8)
 
-    def add_initial_router(self, description="EU"):
+    def add_initial_router(self, description="Você"):
         center_x = self.graphics_view.width() // 2
         center_y = self.graphics_view.height() // 2
         initial_position = self.graphics_view.mapToScene(center_x, center_y)
         svg_item = self.place_router((initial_position.x(), initial_position.y()), description, src="./img/desktop.svg")
         self.svg_items.append(svg_item)
         self.center_on_item(svg_item)
-
-    def on_protocol_start(self):
-        if self.svg_items:
-            self.svg_items.append(self.svg_items[0])
-       
-        self.hasAlreadyStarted = True
-
 
     def place_router(self, position, description, unreachable=False, src="./img/router.svg"):
         if unreachable:
@@ -271,87 +256,34 @@ class ImageWindow(QtWidgets.QWidget):
 
         return svg_item
 
-    
-    def add_router(self, address_info,protocol):
-        print(protocol)
-        print("color", self.arrowColors[protocol])
-        parts = address_info.splitlines(0)
-        address = parts[0]  # TODO: Remover essa gambiarra enfadonha dps
-        ping_time = parts[1] if len(parts) > 1 else None  # TODO:Remover a gambiarra enfadonha 2
+    def add_router(self, address, ping_time=None):
+        description = f"{address} ({ping_time:.2f} ms)" if ping_time else address
+
         last_item = self.svg_items[-1] if self.svg_items else None
-
-        if address in self.router_positions and "*" not in address_info:
-            new_position = self.router_positions[address]
+        last_position = last_item.pos() if last_item else QtCore.QPointF(0, 0)
+        max_attempts = 100
+        for _ in range(max_attempts):
+            offset_x = random.randint(-200, 200)
+            offset_y = random.randint(-200, 200)
+            new_position = (last_position.x() + offset_x, last_position.y() + offset_y)
+            if not self.check_collision(new_position):
+                break
         else:
-            last_position = last_item.pos() if last_item else QtCore.QPointF(0, 0)
-            max_attempts = 100
-            for _ in range(max_attempts):
-                offset_x = random.randint(-300, 300)
-                offset_y = random.randint(-300, 300)
-                new_position = (last_position.x() + offset_x, last_position.y() + offset_y)
-                if not self.check_collision(new_position):
-                    break
-            else:
-                self.update_output("Failed to place a new router without collision.")
-                return
+            self.update_output("Failed to place a new router without collision.")
+            return
 
-            self.router_positions[address] = new_position
-
-        unreachable = "*" in address_info
-        new_svg_item = self.place_router(new_position, address, unreachable=unreachable)
+        unreachable = address == "*"
+        new_svg_item = self.place_router(new_position, description, unreachable=unreachable)
         self.svg_items.append(new_svg_item)
 
         if last_item:
-            self.draw_curved_line_with_arrow(last_item, new_svg_item, ping_time,protocol)
-
-    def draw_curved_line_with_arrow(self, start_item, end_item, ping_time,protocol):
-        start_pos = start_item.boundingRect().center() + start_item.pos()
-        end_pos = end_item.boundingRect().center() + end_item.pos()
-
-        path = QtGui.QPainterPath()
-        path.moveTo(start_pos)
-
-        # Offset for multiple arrows to the same position
-        offset_x = random.randint(-100, 100)
-        offset_y = random.randint(-100, 100)
-        control_point = QPointF((start_pos.x() + end_pos.x()) / 2 + offset_x, (start_pos.y() + end_pos.y()) / 2 + offset_y)
-        path.quadTo(control_point, end_pos)
-
-        path_item = QtWidgets.QGraphicsPathItem(path)
-        path_item.setPen(QtGui.QPen(self.arrowColors[protocol], 2))
-        self.graphics_scene.addItem(path_item)
-
-        self.add_arrowhead(path,protocol)
-        if ping_time is not None:
-            self.add_ping_time_text(path, ping_time,protocol)
-
-    def add_arrowhead(self, path,protocol):
-        # Calculate position for the arrowhead
-        end_point = path.pointAtPercent(1.0)
-        tangent = path.angleAtPercent(1.0)
-        angle_rad = math.radians(tangent)
-
-        arrow_size = 10
-        p1 = end_point + QPointF(math.sin(angle_rad - math.pi / 3) * arrow_size,
-                                 math.cos(angle_rad - math.pi / 3) * arrow_size)
-        p2 = end_point + QPointF(math.sin(angle_rad - math.pi + math.pi / 3) * arrow_size,
-                                 math.cos(angle_rad - math.pi + math.pi / 3) * arrow_size)
-
-        arrow_head = QtGui.QPolygonF([end_point, p1, p2])
-        arrow_item = QtWidgets.QGraphicsPolygonItem(arrow_head)
-        arrow_item.setBrush(self.arrowColors[protocol])
-        self.graphics_scene.addItem(arrow_item)
-
-    def add_ping_time_text(self, path, ping_time,protocol):
-        midpoint = path.pointAtPercent(0.5)
-        text_item = QtWidgets.QGraphicsTextItem(ping_time)
-        text_item.setDefaultTextColor(self.arrowColors[protocol])
-        text_item.setPos(midpoint)
-        font = text_item.font()
-        font.setPointSize(10)
-        font.setBold(True)
-        text_item.setFont(font)
-        self.graphics_scene.addItem(text_item)
+            line = QtWidgets.QGraphicsLineItem(
+                last_item.boundingRect().center().x() + last_item.pos().x(),
+                last_item.boundingRect().center().y() + last_item.pos().y(),
+                new_svg_item.boundingRect().center().x() + new_svg_item.pos().x(),
+                new_svg_item.boundingRect().center().y() + new_svg_item.pos().y())
+            line.setPen(QtGui.QPen(QtCore.Qt.GlobalColor.black, 2))
+            self.graphics_scene.addItem(line)
 
     def update_router_info(self, address, addr_info):
         for item in self.svg_items:
@@ -359,7 +291,7 @@ class ImageWindow(QtWidgets.QWidget):
                 item.description += f"\n{addr_info}"
                 break
 
-    def check_collision(self, position, margin=100):
+    def check_collision(self, position, margin=50):
         for item in self.svg_items:
             item_rect = item.sceneBoundingRect()
             new_rect = QtCore.QRectF(position[0] - margin, position[1] - margin, 
@@ -373,9 +305,9 @@ class ImageWindow(QtWidgets.QWidget):
         self.graphics_view.centerOn(item)
 
     def start_traceroute(self):
-        if not self.hasAlreadyStarted:
-            self.clear_scene()
-            self.add_initial_router()
+        self.clear_scene()
+        self.add_initial_router()
+
 
     def update_output(self, message):
         self.output_text.append(message)
@@ -388,11 +320,9 @@ class ImageWindow(QtWidgets.QWidget):
 
 class TracerouteThread(QThread):
     update_output_signal = pyqtSignal(str)
-    add_router_signal = pyqtSignal(str,str)
-    protocol_start_signal = pyqtSignal()
+    add_router_signal = pyqtSignal(str)
 
-
-    def __init__(self, address, ttl, timeout, attempts, with_geoinfo, protocols,isIPV6):
+    def __init__(self, address, ttl, timeout, attempts, with_geoinfo, protocols):
         super().__init__()
         self.address = address
         self.ttl = ttl
@@ -400,21 +330,16 @@ class TracerouteThread(QThread):
         self.attempts = attempts
         self.with_geoinfo = with_geoinfo
         self.protocols = protocols
-        self.isIPV6 = isIPV6
-    def run(self):
-        #Deixa de forma sequencial para melhor entendimento
-        for protocol in self.protocols:
-            tr.start(self.address, self.ttl, self.timeout, self.attempts,
-                    update_output=self.update_output, add_router=self.add_router, with_geoinfo=self.with_geoinfo,
-                    protocol=protocol,isIPV6=self.isIPV6)
 
-            self.protocol_start_signal.emit()
+    def run(self):
+        tr.start(self.address, self.ttl, self.timeout, self.attempts,
+                 update_output=self.update_output, add_router=self.add_router, with_geoinfo=self.with_geoinfo, protocols=self.protocols)
 
     def update_output(self, message):
         self.update_output_signal.emit(message)
 
-    def add_router(self, description,protocol):
-        self.add_router_signal.emit(description,protocol)
+    def add_router(self, description):
+        self.add_router_signal.emit(description)
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
