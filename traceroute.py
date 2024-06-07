@@ -7,11 +7,11 @@ import socket_creation
 import time
 from util import get_website
 import select
-
+import struct
 DEVICE_NAME:str
 
 
-def tracer(srec,ssend,  port, ttl, destination_address, timeout, update_output, isIPV6):
+def tracer(srec,ssend,  port, ttl, destination_address, timeout,isIPV6,send_function):
     busca = ""
     hasEnded = False
 
@@ -20,7 +20,7 @@ def tracer(srec,ssend,  port, ttl, destination_address, timeout, update_output, 
         try:
 
             start_time = time.time()
-            info, (addr, _) = srec.recvfrom(2000)
+            info, (addr, _) = srec.recvfrom(1024)
             end_time = time.time()
 
             if addr != "*":
@@ -31,19 +31,20 @@ def tracer(srec,ssend,  port, ttl, destination_address, timeout, update_output, 
 
         except socket.error:
             busca += "* "
-        finally:
-            srec.close()
-            ssend.close()
+        if not hasEnded:
+            srec,ssend= resend_msg(destination_address, port, ttl, timeout,isIPV6,send_function)
+        
+        
+        srec.close()
+        ssend.close()
 
-            if not hasEnded:
-                resend_msg(destination_address, port, ttl, timeout,isIPV6)
 
     return busca,ping_time
 
 
-def resend_msg(destination_address, port, ttl, timeout,isIPV6):
+def resend_msg(destination_address, port, ttl, timeout,isIPV6,send_function):
     socket_recv = socket_creation.create_icmp_receive_socket(port,timeout,DEVICE_NAME,isIPV6)
-    socket_sender = send_udp(ttl,port,destination_address,timeout,isIPV6)
+    socket_sender = send_function(ttl,port,destination_address,timeout,isIPV6)
     
     return socket_recv, socket_sender
 
@@ -55,11 +56,13 @@ def send_udp(ttl, port, destination_address,timeout,isIPV6):
     return ssnd
 
 def send_icmp(ttl, port, destination_address, timeout,isIPV6):
-    ssnd = socket_creation.create_icmp_send_socket(ttl,timeout,isIPV6)
+    icmp = socket.getprotobyname("icmp")
+    my_socket = socket.socket(socket.AF_INET, socket.SOCK_RAW, icmp)
+    my_socket.setsockopt(socket.IPPROTO_IP, socket.IP_TTL, struct.pack('I', ttl))
+    my_socket.settimeout(timeout)
     icmp_packet = create_icmp_packet(ttl,isIPV6)
-
-    ssnd.sendto(icmp_packet, (destination_address,0))
-    return ssnd 
+    my_socket.sendto(icmp_packet, (destination_address, 0))
+    return my_socket
 
 def send_tcp(ttl, port, destination_address, timeout,isIPV6):
     ssnd = socket_creation.create_tcp_send_socket(ttl,timeout,isIPV6)
@@ -113,7 +116,7 @@ def traceroute(destination_address, max_hops=60, timeout=3, max_rejections=15, u
         if update_output:
             update_output(f"\nTTL: {ttl}")
 
-        addr,ping_time= tracer(srec, ssend, port, ttl, destination_address, timeout, update_output,isIPV6)
+        addr,ping_time= tracer(srec, ssend, port, ttl, destination_address, timeout,isIPV6, send_function)
 
         total_time = total_time + ping_time
 
@@ -157,6 +160,12 @@ def start(website_address, ttl=60, timeout=3, max_rejections=15, update_output=N
     if update_output:
         update_output(f"Destino: {website} ({website_address})")
 
+    print(website_address)
+    print(ttl)
+    print(timeout)
+    print(max_rejections)
+    print(with_geoinfo)
+    print(protocol)
     traceroute(website_address, max_hops=ttl, timeout=timeout, max_rejections=max_rejections,
                update_output=update_output, add_router=add_router, with_location=with_geoinfo, protocol=protocol, isIPV6=isIPV6)
 
